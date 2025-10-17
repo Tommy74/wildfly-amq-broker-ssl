@@ -1,0 +1,26 @@
+build:
+  uri: https://github.com/Tommy74/wildfly-amq-broker-ssl.git
+  ref: main
+  s2i:
+    buildApplicationImage: true
+deploy:
+  env:
+    - name: ARTEMIS_HOST
+      value: 'ex-aao-sslacceptor-0-svc'
+    - name: ARTEMIS_PORT
+      value: '61617'
+    - name: ARTEMIS_USER
+      value: 'admin'
+    - name: ARTEMIS_PASSWORD
+      value: '1234PIPPOBAUDO'
+    - name: TRUST_STORE_FILENAME
+      value: '/artemis-truststore-secret/client.ts'
+    - name: TRUSTSTORE_PASSWORD
+      value: '1234PIPPOBAUDO'
+  volumes:
+    - name: artemis-truststore-secret-volume
+      secret:
+        secretName: ex-aao-truststore-secret
+  volumeMounts:
+    - name: artemis-truststore-secret-volume
+      mountPath: '/artemis-truststore-secret'

@@ -1,0 +1,15 @@
+# EX_AAO_SSLACCEPTOR_0_SVC_SERVICE_HOST=172.122.128.156
+# EX_AAO_SSLACCEPTOR_0_SVC_SERVICE_PORT=61617
+/socket-binding-group=standard-sockets/remote-destination-outbound-socket-binding=artemis-external-broker:add(host=${env.ARTEMIS_HOST},port=${env.ARTEMIS_PORT})
+/subsystem=naming/binding="java:global/remote":add(binding-type=external-context,class=javax.naming.InitialContext,environment={java.naming.factory.initial => org.apache.activemq.artemis.jndi.ActiveMQInitialContextFactory,java.naming.provider.url => "tcp://${env.ARTEMIS_HOST}:${env.ARTEMIS_PORT}",connectionFactory.ConnectionFactory => "tcp://${env.ARTEMIS_HOST}:${env.ARTEMIS_PORT}",queue.testQueue => testQueue,queue.outQueue => outQueue, queue.inQueue => inQueue},module=org.apache.activemq.artemis)
+/subsystem=naming/binding="java:/jms/amq/queue/testQueue":add(binding-type=lookup,lookup="java:global/remote/testQueue")
+/subsystem=naming/binding="java:/jms/amq/queue/outQueue":add(binding-type=lookup,lookup="java:global/remote/outQueue")
+/subsystem=naming/binding="java:/jms/amq/queue/inQueue":add(binding-type=lookup,lookup="java:global/remote/inQueue")
+# TLS
+/subsystem=messaging-activemq/remote-connector=netty-remote-broker-ssl:add(params={ssl-enabled => true,trustStorePath => "${env.TRUST_STORE_FILENAME}",trustStorePassword => "${env.TRUSTSTORE_PASSWORD}",verify-host => false},socket-binding=artemis-external-broker)
+/subsystem=messaging-activemq/pooled-connection-factory=activemq-ra-remote:add(connectors=[netty-remote-broker-ssl],entries=["java:/RemoteJmsXA","java:jboss/RemoteJmsXA","java:jboss/RemoteJMSConnectionFactory"],ha=false,max-pool-size=30,min-pool-size=15,password=${env.ARTEMIS_PASSWORD},statistics-enabled=true,transaction=xa,use-auto-recovery=false,user=${env.ARTEMIS_USER},jndi-params="java.naming.factory.initial=org.apache.activemq.artemis.jndi.ActiveMQInitialContextFactory;java.naming.provider.url=tcp://${env.ARTEMIS_HOST}:${env.ARTEMIS_PORT};java.naming.security.principal=${env.ARTEMIS_USER};java.naming.security.credentials=${env.ARTEMIS_PASSWORD}",rebalance-connections=true,setup-attempts=-1,setup-interval=5000,use-jndi=false,allow-local-transactions=true)
+/subsystem=ee:write-attribute(name=jboss-descriptor-property-replacement,value=true)
+/subsystem=ee:write-attribute(name=annotation-property-replacement,value=true)
+/subsystem=ee:write-attribute(name=spec-descriptor-property-replacement,value=true)
+/subsystem=ejb3:write-attribute(name=default-resource-adapter-name, value=activemq-ra-remote)
+/subsystem=ee/service=default-bindings:write-attribute(name=jms-connection-factory, value=java:jboss/RemoteJMSConnectionFactory)
