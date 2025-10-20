@@ -6,6 +6,8 @@ import jakarta.jms.Connection;
 import jakarta.jms.ConnectionFactory;
 import jakarta.jms.JMSConsumer;
 import jakarta.jms.JMSContext;
+import jakarta.jms.JMSDestinationDefinition;
+import jakarta.jms.JMSDestinationDefinitions;
 import jakarta.jms.MessageProducer;
 import jakarta.jms.Queue;
 import jakarta.jms.Session;
@@ -22,24 +24,46 @@ import java.util.logging.Logger;
 /**
  * Test servlet which can be used to invoke common JMS tasks in test classes.
  */
+@JMSDestinationDefinitions(
+        value = {
+                @JMSDestinationDefinition(
+                        name = "java:/queue/testQueue",
+                        interfaceName = "jakarta.jms.Queue",
+                        destinationName = "test-queue",
+                        properties = {"enable-amq1-prefix=false"}
+                ),
+                @JMSDestinationDefinition(
+                        name = "java:/queue/inQueue",
+                        interfaceName = "jakarta.jms.Queue",
+                        destinationName = "in-queue",
+                        properties = {"enable-amq1-prefix=false"}
+                ),
+                @JMSDestinationDefinition(
+                        name = "java:/queue/outQueue",
+                        interfaceName = "jakarta.jms.Queue",
+                        destinationName = "out-queue",
+                        properties = {"enable-amq1-prefix=false"}
+                )
+        }
+)
 @WebServlet("/jms-test")
 public class JmsTestServlet extends HttpServlet {
 
 	private static final Logger LOGGER = Logger.getLogger(JmsTestServlet.class.toString());
 
-	@Resource(lookup = "java:/jms/amq/queue/testQueue")
+	@Resource(lookup="java:/queue/testQueue")
 	private Queue testQueue;
 
-	@Resource(lookup = "java:/jms/amq/queue/inQueue")
+	@Resource(lookup="java:/queue/inQueue")
 	private Queue inQueue;
 
-	@Resource(lookup = "java:/jms/amq/queue/outQueue")
+	@Resource(lookup="java:/queue/outQueue")
 	private Queue outQueue;
 
 	@Inject()
 	private JMSContext jmsContext;
 
-	@Resource(lookup = "java:jboss/RemoteJmsXA")
+	@Resource(lookup = "java:jboss/DefaultJMSConnectionFactory")
 	private ConnectionFactory connectionFactory;
 
 	@Override

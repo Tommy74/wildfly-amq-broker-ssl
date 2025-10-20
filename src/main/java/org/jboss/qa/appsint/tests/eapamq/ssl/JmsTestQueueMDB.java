@@ -20,10 +20,9 @@ import java.util.logging.Logger;
  * Test message driven bean to consume a Text messages with "consumer = 'MDB'" selector from testQueue.
  */
 @MessageDriven(name = "testQueueMDB", activationConfig = {
-		@ActivationConfigProperty(propertyName = "destinationLookup", propertyValue = "java:/jms/amq/queue/inQueue"),
+		@ActivationConfigProperty(propertyName = "destinationLookup", propertyValue = "queue/inQueue"),
 		@ActivationConfigProperty(propertyName = "destinationType", propertyValue = "jakarta.jms.Queue"),
-		@ActivationConfigProperty(propertyName = "acknowledgeMode", propertyValue = "Auto-acknowledge"),
-		@ActivationConfigProperty(propertyName = "connectionFactoryLookup", propertyValue = "java:jboss/RemoteJmsXA")
+		@ActivationConfigProperty(propertyName = "acknowledgeMode", propertyValue = "Auto-acknowledge")
 })
 public class JmsTestQueueMDB implements MessageListener {
 
@@ -36,7 +35,7 @@ public class JmsTestQueueMDB implements MessageListener {
 	@Inject()
 	private JMSContext context;
 
-	@Resource(lookup = "java:/jms/amq/queue/outQueue")
+    @Resource(lookup="java:/queue/outQueue")
 	private Queue outQueue;
 
 	/**

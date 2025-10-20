@@ -5,9 +5,9 @@ build:
     buildApplicationImage: true
 deploy:
   env:
-    - name: ARTEMIS_HOST
+    - name: JBOSS_MESSAGING_CONNECTOR_HOST
       value: 'ex-aao-sslacceptor-0-svc'
-    - name: ARTEMIS_PORT
+    - name: JBOSS_MESSAGING_CONNECTOR_PORT
       value: '61617'
     - name: ARTEMIS_USER
       value: 'admin'

@@ -1,6 +1,86 @@
-# wildfly-amq-broker-ssl
+# WildFly + Artemis AcriveMQ + TLS
 
 This project demonstrates how-to install a WildFly based microservice on OpenShift which connects to a remote Artemis AcriveMQ Broker;
+
+## Create TLS Private Key and Self-signed Certificate
+
+This step is required for both the [Manual Setup on your laptop](#manual-setup-on-your-laptop) and [Manual Setup on OpenShift](#manual-setup-on-openshift) setups;
+
+### Generates a key pair into a JKS store (privatekey.pkcs12)
+
+We prepare a `keystore` containing a **PRIVATE KEY** + **self-signed certificate** (**self-signed certificate** = a certificate for the **public key** corresponding to the **PRIVATE KEY** which is signed with the **PRIVATE KEY** itself):
+```shell
+keytool -genkeypair -noprompt -alias server -keyalg RSA -keysize 2048 -sigalg SHA256withRSA -dname "CN=ex-aao-all-0-svc-rte.amq.svc.cluster.local" -validity 365 -keystore privatekey.pkcs12 -storepass 1234PIPPOBAUDO -storetype PKCS12 -ext 'san=dns:*.amq.svc.cluster.local'
+```
+
+List the content in `privatekey.pkcs12`:
+```shell
+keytool -list -keystore privatekey.pkcs12 -storepass 1234PIPPOBAUDO
+```
+
+### Exports certificate (truststore.pkcs12)
+
+We export the **self-signed certificate** contained in the `keystore`:
+```shell
+keytool -exportcert -noprompt -rfc -alias server -file hostname.crt -keystore privatekey.pkcs12 -storepass 1234PIPPOBAUDO -storetype PKCS12
+```
+We make a `truststore` containing the **self-signed certificate**:
+```shell
+keytool -import -v -trustcacerts -noprompt -alias server -file hostname.crt -keystore truststore.pkcs12 -storetype PKCS12 -storepass 1234PIPPOBAUDO
+```
+
+## Manual Setup on your laptop
+
+This is only for debug purposes in case you want to try the configuration locally before deploying on OpenShift;
+
+### Artemis AcriveMQ Broker
+
+Download [apache-artemis-2.43.0-bin.zip](https://dlcdn.apache.org/activemq/activemq-artemis/2.43.0/apache-artemis-2.43.0-bin.zip);
+
+Unzip it and you'll get a folder named `apache-artemis-2.43.0`;
+
+```bash
+cd apache-artemis-2.43.0
+ls
+bin  lib  LICENSE  licenses  NOTICE  README.html  schema  web
+```
+
+Create a broker in a folder outside the `apache-artemis-2.43.0` folder:
+
+```bash
+export ARTEMIS_HOME=/path/to/apache-artemis-2.43.0
+${ARTEMIS_HOME}/bin/artemis create mybroker --user=admin --password=admin
+```
+
+Enable TLS by adding `sslEnabled=true;keyStorePath=/some-path/privatekey.pkcs12;keyStorePassword=1234PIPPOBAUDO;trustStorePath=/some-path/truststore.pkcs12;trustStorePassword=1234PIPPOBAUDO;` to the `acceptor` URL:
+
+```xml
+<acceptor name="artemis">tcp://0.0.0.0:61616?sslEnabled=true;keyStorePath=/some-path/privatekey.pkcs12;keyStorePassword=1234PIPPOBAUDO;trustStorePath=/some-path/truststore.pkcs12;trustStorePassword=1234PIPPOBAUDO;tcpSendBufferSize=1048576;tcpReceiveBufferSize=1048576;amqpMinLargeMessageSize=102400;protocols=CORE,AMQP,STOMP,HORNETQ,MQTT,OPENWIRE;useEpoll=true;amqpCredits=1000;amqpLowCredits=300;amqpDuplicateDetection=true;supportAdvisory=false;suppressInternalManagementObjects=false</acceptor>
+```
+
+Start the broker:
+```bash
+./mybroker/bin/artemis" run
+```
+
+### WildFly
+
+```shell
+export TRUST_STORE_FILENAME=/some-path/truststore.pkcs12
+export TRUSTSTORE_PASSWORD=1234PIPPOBAUDO
+export ARTEMIS_USER=admin
+export ARTEMIS_PASSWORD=admin
+export JBOSS_MESSAGING_CONNECTOR_HOST=localhost
+export JBOSS_MESSAGING_CONNECTOR_PORT=61616      
+mvn clean install && ./target/server/bin/standalone.sh
+```
+
+Now hit:
+
+* http://localhost:8080/jms-test?request=send-message
+* http://localhost:8080/jms-test?request=consume-message
+
+to check everything works
 
 ## Manual Setup on OpenShift
 
@@ -14,30 +94,7 @@ https://github.com/rh-messaging/activemq-artemis-operator/blob/main/docs/getting
 kubectl apply -f https://github.com/arkmq-org/activemq-artemis-operator/releases/latest/download/activemq-artemis-operator.yaml
 ```
 
-### Using Custom Certificates
 
-#### Generates a key pair into a JKS store (privatekey.pkcs12)
-
-We prepare a `keystore` containing a **KEY** + **self-signed certificate** (**self-signed certificate** = a certificate, containing the **public key** corresponding to the **KEY**, which is signed with the **KEY** itself):
-```shell
-keytool -genkeypair -noprompt -alias server -keyalg RSA -keysize 2048 -sigalg SHA256withRSA -dname "CN=ex-aao-all-0-svc-rte.amq.svc.cluster.local" -validity 365 -keystore privatekey.pkcs12 -storepass 1234PIPPOBAUDO -storetype PKCS12 -ext 'san=dns:*.amq.svc.cluster.local'
-```
-
-List the content in `privatekey.pkcs12`:
-```shell
-keytool -list -keystore privatekey.pkcs12 -storepass 1234PIPPOBAUDO
-```
-
-#### Exports certificate (truststore.pkcs12)
-
-We export the **self-signed certificate** contained in the `keystore`:
-```shell
-keytool -exportcert -noprompt -rfc -alias server -file hostname.crt -keystore privatekey.pkcs12 -storepass 1234PIPPOBAUDO -storetype PKCS12
-```
-We make a `truststore` containing the **self-signed certificate**:
-```shell
-keytool -import -v -trustcacerts -noprompt -alias server -file hostname.crt -keystore truststore.pkcs12 -storetype PKCS12 -storepass 1234PIPPOBAUDO
-```
 
 ### Create Secret containing key and self-signed certificate
 
@@ -103,19 +160,6 @@ spec:
   properties:
     adminPassword: admin
     adminUser: 1234PIPPOBAUDO
-    brokerProperties:
-    - addressConfigurations.test-address.routingTypes=MULTICAST
-    - addressConfigurations.out-address.routingTypes=MULTICAST
-    - addressConfigurations.in-address.routingTypes=MULTICAST
-    - addressConfigurations.test-address.queueConfigs.test-queue.routingType=ANYCAST
-    - addressConfigurations.test-address.queueConfigs.test-queue.addressName=testQueue
-    - addressConfigurations.test-address.queueConfigs.test-queue.queueName=testQueue
-    - addressConfigurations.out-address.queueConfigs.out-queue.routingType=ANYCAST
-    - addressConfigurations.out-address.queueConfigs.out-queue.addressName=outQueue
-    - addressConfigurations.out-address.queueConfigs.out-queue.queueName=outQueue
-    - addressConfigurations.in-address.queueConfigs.in-queue.routingType=ANYCAST
-    - addressConfigurations.in-address.queueConfigs.in-queue.addressName=inQueue
-    - addressConfigurations.in-address.queueConfigs.in-queue.queueName=inQueue
   acceptors:
   - name: sslacceptor
     protocols: all
@@ -136,46 +180,6 @@ spec:
 EOF
 
 oc apply -f /tmp/ActiveMQArtemis.yaml
-```
-
-Alternatively, configure addresses like:
-```shell
-cat <<EOF > /tmp/ActiveMQArtemisAddress.yaml
-kind: ActiveMQArtemisAddress
-apiVersion: broker.amq.io/v1beta1
-metadata:
-  name: test-queue
-spec:
-  addressName: testQueue
-  queueName: testQueue
-  routingType: anycast
-status:
-  conditions: []
----
-kind: ActiveMQArtemisAddress
-apiVersion: broker.amq.io/v1beta1
-metadata:
-  name: out-queue
-spec:
-  addressName: outQueue
-  queueName: outQueue
-  routingType: anycast
-status:
-  conditions: []  
----
-kind: ActiveMQArtemisAddress
-apiVersion: broker.amq.io/v1beta1
-metadata:
-  name: in-queue
-spec:
-  addressName: inQueue
-  queueName: inQueue
-  routingType: anycast
-status:
-  conditions: []
-EOF
-
-oc apply -f /tmp/ActiveMQArtemisAddress.yaml
 ```
 
 ### Inspect ActiveMQ Server
