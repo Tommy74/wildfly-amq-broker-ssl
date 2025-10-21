@@ -1,4 +1,4 @@
-package org.jboss.qa.appsint.tests.eapamq.ssl;
+package org.wildfly.amq.ssl;
 
 public enum JmsTestRequestType {
 	REQUEST_SEND("send-message"),

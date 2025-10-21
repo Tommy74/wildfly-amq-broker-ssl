@@ -1,4 +1,4 @@
-package org.jboss.qa.appsint.tests.eapamq.ssl;
+package org.wildfly.amq.ssl;
 
 import jakarta.annotation.Resource;
 import jakarta.inject.Inject;
