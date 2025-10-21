@@ -1,30 +1,44 @@
 # WildFly + Artemis AcriveMQ + TLS
 
-This project demonstrates how-to install a WildFly based microservice on OpenShift which connects to a remote Artemis AcriveMQ Broker;
+This project demonstrates how-to install a WildFly based microservice on OpenShift which connects to a remote Artemis AcriveMQ Broker which is running on OpenShift too in the same namespace;
 
 ## Create TLS Private Key and Self-signed Certificate
 
+Creating the TLS Private Key and Self-signed Certificate is necessary in order to encrypt the communication between WildFly
+and the Artemis AcriveMQ Broker;
+
 This step is required for both the [Manual Setup on your laptop](#manual-setup-on-your-laptop) and [Manual Setup on OpenShift](#manual-setup-on-openshift) setups;
 
-### Generates a key pair into a JKS store (privatekey.pkcs12)
+### Generate Private Key and Self-signed Certificate into a JKS store (privatekey.pkcs12)
 
 We prepare a `keystore` containing a **PRIVATE KEY** + **self-signed certificate** (**self-signed certificate** = a certificate for the **public key** corresponding to the **PRIVATE KEY** which is signed with the **PRIVATE KEY** itself):
+
 ```shell
 keytool -genkeypair -noprompt -alias server -keyalg RSA -keysize 2048 -sigalg SHA256withRSA -dname "CN=ex-aao-all-0-svc-rte.amq.svc.cluster.local" -validity 365 -keystore privatekey.pkcs12 -storepass 1234PIPPOBAUDO -storetype PKCS12 -ext 'san=dns:*.amq.svc.cluster.local'
 ```
 
 List the content in `privatekey.pkcs12`:
 ```shell
-keytool -list -keystore privatekey.pkcs12 -storepass 1234PIPPOBAUDO
+$ keytool -list -keystore privatekey.pkcs12 -storepass 1234PIPPOBAUDO
+Keystore type: PKCS12
+Keystore provider: SUN
+
+Your keystore contains 1 entry
+
+server, Oct 20, 2025, PrivateKeyEntry, 
+Certificate fingerprint (SHA-256): 4D:95:6B:83:6C:E5:77:7E:DA:47:5D:C4:34:09:3B:1A:E5:DE:68:23:F0:D3:0B:7E:AC:F3:71:88:5A:A0:9E:D9
 ```
 
-### Exports certificate (truststore.pkcs12)
+### Export Self-signed Certificate (truststore.pkcs12)
 
-We export the **self-signed certificate** contained in the `keystore`:
+First, we export the **self-signed certificate** contained in the `keystore`:
+
 ```shell
 keytool -exportcert -noprompt -rfc -alias server -file hostname.crt -keystore privatekey.pkcs12 -storepass 1234PIPPOBAUDO -storetype PKCS12
 ```
-We make a `truststore` containing the **self-signed certificate**:
+
+Then, we make a `truststore` containing the **self-signed certificate** we just exported:
+
 ```shell
 keytool -import -v -trustcacerts -noprompt -alias server -file hostname.crt -keystore truststore.pkcs12 -storetype PKCS12 -storepass 1234PIPPOBAUDO
 ```
@@ -49,21 +63,27 @@ Create a broker in a folder outside the `apache-artemis-2.43.0` folder:
 
 ```bash
 export ARTEMIS_HOME=/path/to/apache-artemis-2.43.0
-${ARTEMIS_HOME}/bin/artemis create mybroker --user=admin --password=admin
+${ARTEMIS_HOME}/bin/artemis create mybroker \
+  --user=admin \
+  --password=admin \
+  --require-login
 ```
 
-Enable TLS by adding `sslEnabled=true;keyStorePath=/some-path/privatekey.pkcs12;keyStorePassword=1234PIPPOBAUDO;trustStorePath=/some-path/truststore.pkcs12;trustStorePassword=1234PIPPOBAUDO;` to the `acceptor` URL:
+Now edit the `mybroker/etc/broker.xml` file and enable TLS by adding `sslEnabled=true;keyStorePath=/some-path/privatekey.pkcs12;keyStorePassword=1234PIPPOBAUDO;` to the URL of the `acceptor` named `artemis` (the one listening on port `61616`):
 
 ```xml
-<acceptor name="artemis">tcp://0.0.0.0:61616?sslEnabled=true;keyStorePath=/some-path/privatekey.pkcs12;keyStorePassword=1234PIPPOBAUDO;trustStorePath=/some-path/truststore.pkcs12;trustStorePassword=1234PIPPOBAUDO;tcpSendBufferSize=1048576;tcpReceiveBufferSize=1048576;amqpMinLargeMessageSize=102400;protocols=CORE,AMQP,STOMP,HORNETQ,MQTT,OPENWIRE;useEpoll=true;amqpCredits=1000;amqpLowCredits=300;amqpDuplicateDetection=true;supportAdvisory=false;suppressInternalManagementObjects=false</acceptor>
+<acceptor name="artemis">tcp://0.0.0.0:61616?sslEnabled=true;keyStorePath=/some-path/privatekey.pkcs12;keyStorePassword=1234PIPPOBAUDO;tcpSendBufferSize=1048576;tcpReceiveBufferSize=1048576;amqpMinLargeMessageSize=102400;protocols=CORE,AMQP,STOMP,HORNETQ,MQTT,OPENWIRE;useEpoll=true;amqpCredits=1000;amqpLowCredits=300;amqpDuplicateDetection=true;supportAdvisory=false;suppressInternalManagementObjects=false</acceptor>
 ```
 
 Start the broker:
 ```bash
-./mybroker/bin/artemis" run
+./mybroker/bin/artemis run
 ```
 
 ### WildFly
+
+Set the environment variables needed to point WildFly to the Artemis AcriveMQ Broker and the truststore; 
+then build and start WildFly;
 
 ```shell
 export TRUST_STORE_FILENAME=/some-path/truststore.pkcs12
