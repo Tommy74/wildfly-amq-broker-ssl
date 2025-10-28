@@ -4,4 +4,5 @@
 /subsystem=messaging-activemq/remote-connector=artemis:map-put(name=params, key=trustStorePath, value="${env.TRUST_STORE_FILENAME}")
 /subsystem=messaging-activemq/remote-connector=artemis:map-put(name=params, key=trustStorePassword, value="${env.TRUSTSTORE_PASSWORD}")
 /subsystem=messaging-activemq/remote-connector=artemis:map-put(name=params, key=verify-host, value=false)
-
+# https://access.redhat.com/solutions/3078171 : needed to start the server locally
+/subsystem=jgroups/stack=tcp/protocol=PING:add(add-index=1)
